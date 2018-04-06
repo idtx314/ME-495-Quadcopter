@@ -85,7 +85,7 @@ int previous_beat = 0;  //Gyro is stable, accelerometer is accurate
 int previous_vive_beat = 0; //Heartbeat for vive
 long last_beat = 0;
 long last_vive_beat = 0;  //Vive
-float neutral_power = 1600;
+float neutral_power = 1500;
 float desired_thrust = 0;
 int pause_command = 0;
 Position local_p;       //Position struct from vive.h
@@ -206,11 +206,13 @@ void get_joystick(void)
 
 void vive_control()
 {
-  int Kpv = 200;
+  int Kpv = 300;
   desired_yaw_rate = -Kpv*(0-local_p.yaw); //(keyboard.yaw-128.0)* max_yaw /112.0;
 
-  float Px = 0.004;
-  float Dx = 2.0;
+  float Px = 0.015; // 0.03;
+  float Dx = 2.5; // 1.5;
+  Px = 0.02;
+  Dx = 1.5;
   x_est = x_est*.6 + local_p.x*.4;
   desired_roll = -Px*(x_est - 0) - Dx*(x_est - prev_x);
   prev_x = x_est;
@@ -226,12 +228,12 @@ void vive_control()
 
   //Thrust controller
   //We will use desired thrust modified to fight position change.
-  float Pz=.12, Dz= 0.5, Iz=0/*.003*/;
+  float Pz=.12, Dz= 1, Iz=.001;
   float thrust_error = local_p.z - 3750;
-  thrust_I += thrust_error*Iz;
-  float I_max = 300.0;
+  float I_max = 150.0;
+  thrust_I += Iz*thrust_error;
   if (thrust_I > I_max) { thrust_I = I_max; }
-  if (thrust_I < 0) { thrust_I = -I_max;}
+  if (thrust_I < 0) { thrust_I = 0;}
 
   if(local_p.version == prev_vive_version)
   {
@@ -257,21 +259,21 @@ void vive_control()
     prev_vive_version = local_p.version;
   }
 
+  //cap statments
+  float D_term = Dz*z_vel_est;
+  if(D_term < -100)
+    D_term = -100;
+
+  desired_thrust = Pz*(thrust_error) + D_term + thrust_I;
 
 
-  desired_thrust = Pz*(thrust_error) + Dz*z_vel_est + thrust_I;
-  if (desired_thrust < 0){desired_thrust=0;}
+  // if (desired_thrust < 0){desired_thrust=0;}
+
+//P term for major corrections, D strong, I weak and capped at 0
 
 
 
-
-  //Debug: Are these needed? Concerned they may be preventing recovery
-  // if (desired_roll > 3.0) { desired_roll = 3.0; }
-  // else if (desired_roll < -3.0) { desired_roll = -3.0; }
-  // if (desired_pitch > 3.0) { desired_pitch = 3.0; }
-  // else if (desired_pitch < -3.0) { desired_pitch = -3.0; }
-
-  //printf("%f\t%f\t%f\t%f\n",roll_angle,desired_roll,pitch_angle,desired_pitch);
+  printf("%f\t%f\t%f\n",Pz*thrust_error,D_term,thrust_I);
   //todo remove
 }
 
@@ -293,8 +295,8 @@ void pid_update()
   float yaw_rate_error = desired_yaw_rate - imu_data[2];
   //like thrust, but I want to add a value to some motors and subtract that from others.
 
-  float thrust = neutral_power + desired_thrust- (keyboard.thrust-128.0)*200.0/112.0;
-  printf("%f\t%f\t%f\n",thrust,desired_thrust,(keyboard.thrust-128.0)*200.0/112.0);
+  float thrust = neutral_power + desired_thrust - (keyboard.thrust-128.0)*200.0/112.0;
+
 
   float pitch_velocity;
   pitch_velocity = pitch_angle - prev_pitch;
