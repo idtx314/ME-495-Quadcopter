@@ -11,6 +11,7 @@
 #include <curses.h>
 #include "vive.h"
 
+//This is the special command to compile flight-manager.cpp as "flight_manager"
 //gcc -o flight_manager flight_manager.cpp -lwiringPi -lncurses -lm
 
 #define frequency  25000000.0
